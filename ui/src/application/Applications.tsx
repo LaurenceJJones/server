@@ -23,26 +23,53 @@ import {LastUsedCell} from '../common/LastUsedCell';
 import {useStores} from '../stores';
 import {observer} from 'mobx-react-lite';
 import {makeStyles} from 'tss-react/mui';
-import {ButtonBase, Tooltip} from '@mui/material';
+import {Tooltip, Box} from '@mui/material';
 
 const useStyles = makeStyles()((theme) => ({
     imageContainer: {
-        '&::after': {
-            content: '"×"',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: 40,
-            height: 40,
-            background: theme.palette.error.main,
-            color: theme.palette.getContrastText(theme.palette.error.main),
-            fontSize: 40,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: 0,
+        position: 'relative',
+        display: 'inline-block',
+        cursor: 'pointer',
+    },
+    deleteButton: {
+        position: 'absolute',
+        top: -8,
+        right: -8,
+        width: 20,
+        height: 20,
+        minWidth: 20,
+        padding: 0,
+        backgroundColor: theme.palette.error.main,
+        color: theme.palette.getContrastText(theme.palette.error.main),
+        '&:hover': {
+            backgroundColor: theme.palette.error.dark,
         },
-        '&:hover::after': {opacity: 1},
+    },
+    deleteIcon: {
+        fontSize: 14,
+    },
+    uploadOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        transition: 'opacity 0.2s ease-in-out',
+        pointerEvents: 'none',
+    },
+    uploadOverlayVisible: {
+        opacity: 1,
+    },
+    uploadOverlayHidden: {
+        opacity: 0,
+    },
+    uploadIcon: {
+        color: theme.palette.common.white,
+        fontSize: 24,
     },
 }));
 
@@ -197,25 +224,80 @@ const Row = ({
     image,
     fEdit,
 }: IRowProps) => {
-    const {classes} = useStyles();
+    const {classes, cx} = useStyles();
+    const isDefaultImage = image.startsWith('static/defaultapp.png');
+    const [tooltipContent, setTooltipContent] = useState<string>(
+        isDefaultImage ? 'Click to upload image' : 'Click to replace image'
+    );
+    const [showImageTooltip, setShowImageTooltip] = useState(true);
+    const [isHoveringImage, setIsHoveringImage] = useState(false);
+    
+    const handleImageClick = (e: React.MouseEvent) => {
+        // Don't trigger upload if clicking the delete button
+        if ((e.target as HTMLElement).closest('.delete-image-button')) {
+            return;
+        }
+        fUpload();
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        fDeleteImage();
+    };
+
     return (
         <TableRow>
             <TableCell padding="normal">
-                <div style={{display: 'flex'}}>
-                    <Tooltip title="Delete image" placement="top" arrow>
-                        <ButtonBase className={classes.imageContainer} onClick={fDeleteImage}>
+                <Box 
+                    className={classes.imageContainer} 
+                    onClick={handleImageClick}
+                    onMouseEnter={() => isDefaultImage && setIsHoveringImage(true)}
+                    onMouseLeave={() => setIsHoveringImage(false)}>
+                    <Tooltip 
+                        title={tooltipContent} 
+                        placement="top" 
+                        arrow
+                        disableHoverListener={!showImageTooltip}>
+                        <div style={{position: 'relative'}}>
                             <img
                                 src={config.get('url') + image}
                                 alt="app logo"
                                 width="40"
                                 height="40"
                             />
-                        </ButtonBase>
+                            {isDefaultImage && (
+                                <div className={cx(
+                                    classes.uploadOverlay,
+                                    isHoveringImage ? classes.uploadOverlayVisible : classes.uploadOverlayHidden
+                                )}>
+                                    <CloudUpload className={classes.uploadIcon} />
+                                </div>
+                            )}
+                        </div>
                     </Tooltip>
-                    <IconButton onClick={fUpload} style={{height: 40}}>
-                        <CloudUpload />
-                    </IconButton>
-                </div>
+                    {!isDefaultImage && (
+                        <Tooltip 
+                            title="Delete image" 
+                            placement="top" 
+                            arrow
+                            disableHoverListener={showImageTooltip}>
+                            <IconButton
+                                className={`${classes.deleteButton} delete-image-button`}
+                                onClick={handleDeleteClick}
+                                onMouseEnter={() => {
+                                    setShowImageTooltip(false);
+                                    setTooltipContent('');
+                                }}
+                                onMouseLeave={() => {
+                                    setShowImageTooltip(true);
+                                    setTooltipContent(isDefaultImage ? 'Click to upload image' : 'Click to replace image');
+                                }}
+                                size="small">
+                                <Delete className={classes.deleteIcon} />
+                            </IconButton>
+                        </Tooltip>
+                    )}
+                </Box>
             </TableCell>
             <TableCell>{name}</TableCell>
             <TableCell>
